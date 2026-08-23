@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 import yfinance as yf
 
 app = FastAPI()
@@ -31,3 +31,14 @@ def get_options(ticker: str):
         }
     except Exception as e:
         return {"error": str(e)}
+
+# مسار استقبال الـ Webhook من TradingView
+@app.post("/webhook")
+async def tradingview_webhook(request: Request):
+    try:
+        data = await request.json()
+        print("📢 تم استقبال تنبيه من TradingView:", data)
+        # يمكنك هنا إضافة أي كود إضافي لمعالجة البيانات الواردة من الشارت
+        return {"status": "success", "message": "Webhook received successfully", "data": data}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
