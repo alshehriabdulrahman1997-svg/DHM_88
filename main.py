@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 import yfinance as yf
 
 app = FastAPI()
@@ -7,23 +7,34 @@ app = FastAPI()
 def home():
     return {"status": "DHM88 Server is Active & Running!"}
 
+# مسار لجلب التواريخ المتاحة للسهم
+@app.get("/dates/{ticker}")
+def get_dates(ticker: str):
+    try:
+        stock = yf.Ticker(ticker.upper())
+        return {"ticker": ticker.upper(), "available_dates": stock.options}
+    except Exception as e:
+        return {"error": str(e)}
+
+# مسار لجلب العقود لتاريخ محدد (أو أقرب تاريخ إذا ما حددت تاريخ)
 @app.get("/get_options/{ticker}")
-def get_options(ticker: str):
+def get_options(ticker: str, date: str = None):
     try:
         stock = yf.Ticker(ticker.upper())
         exp_dates = stock.options
         if not exp_dates:
-            return {"error": "No options found for this ticker"}
+            return {"error": "No options found"}
             
-        next_friday = exp_dates[0]
-        opt_chain = stock.option_chain(next_friday)
+        # إذا ما أرسلت تاريخ، ياخذ أول (أقرب) تاريخ
+        selected_date = date if date in exp_dates else exp_dates[0]
         
+        opt_chain = stock.option_chain(selected_date)
         calls = opt_chain.calls.sort_values(by='openInterest', ascending=False).head(2)
         puts = opt_chain.puts.sort_values(by='openInterest', ascending=False).head(2)
         
         return {
             "ticker": ticker.upper(),
-            "expiration": next_friday,
+            "expiration": selected_date,
             "c1_p": float(calls.iloc[0]['strike']), "c1_oi": int(calls.iloc[0]['openInterest']),
             "c2_p": float(calls.iloc[1]['strike']), "c2_oi": int(calls.iloc[1]['openInterest']),
             "p1_p": float(puts.iloc[0]['strike']), "p1_oi": int(puts.iloc[0]['openInterest']),
@@ -31,14 +42,3 @@ def get_options(ticker: str):
         }
     except Exception as e:
         return {"error": str(e)}
-
-# مسار استقبال الـ Webhook من TradingView
-@app.post("/webhook")
-async def tradingview_webhook(request: Request):
-    try:
-        data = await request.json()
-        print("📢 تم استقبال تنبيه من TradingView:", data)
-        # يمكنك هنا إضافة أي كود إضافي لمعالجة البيانات الواردة من الشارت
-        return {"status": "success", "message": "Webhook received successfully", "data": data}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
